@@ -999,6 +999,11 @@ func TestGenerateOnlyProjectCheck(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			oldTemplatePathEnvVar := os.Getenv("PULUMI_TEMPLATE_PATH")
+			defer os.Setenv("PULUMI_TEMPLATE_PATH", oldTemplatePathEnvVar)
+
+			os.Setenv("PULUMI_TEMPLATE_PATH", filepath.Join(os.Getenv("TEST_TMPDIR"), "templates"))
+
 			tempdir := tempProjectDir(t)
 			chdir(t, tempdir)
 
@@ -1070,6 +1075,11 @@ func TestPulumiNewSetsTemplateTag(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
+			oldTemplatePathEnvVar := os.Getenv("PULUMI_TEMPLATE_PATH")
+			defer os.Setenv("PULUMI_TEMPLATE_PATH", oldTemplatePathEnvVar)
+
+			os.Setenv("PULUMI_TEMPLATE_PATH", filepath.Join(os.Getenv("TEST_TMPDIR"), "templates"))
+
 			tempdir := tempProjectDir(t)
 			chdir(t, tempdir)
 
