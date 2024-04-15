@@ -1346,6 +1346,11 @@ func (b *diyBackend) UpdateStackDeployment(ctx context.Context, stack backend.St
 	return errors.New("stack deployments not supported in --local mode")
 }
 
+func (b *diyBackend) DestroyStackDeployment(ctx context.Context, stack backend.Stack) error {
+	// The local backend does not currently persist tags.
+	return errors.New("stack deployments not supported in --local mode")
+}
+
 func (b *diyBackend) GetStackDeployment(ctx context.Context,
 	stack backend.Stack,
 ) (*apitype.DeploymentSettings, error) {
