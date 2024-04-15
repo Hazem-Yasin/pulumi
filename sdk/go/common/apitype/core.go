@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/pulumi/pulumi/sdk/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/config"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
@@ -350,10 +351,10 @@ type ManifestV1 struct {
 
 // PluginInfoV1 captures the version and information about a plugin.
 type PluginInfoV1 struct {
-	Name    string `json:"name" yaml:"name"`
-	Path    string `json:"path" yaml:"path"`
-	Type    string `json:"type" yaml:"type"` // tmp fix to prevent circular dependency
-	Version string `json:"version" yaml:"version"`
+	Name    string               `json:"name" yaml:"name"`
+	Path    string               `json:"path" yaml:"path"`
+	Type    workspace.PluginKind `json:"type" yaml:"type"`
+	Version string               `json:"version" yaml:"version"`
 }
 
 // SecretV1 captures the information that a particular value is secret and must be decrypted before use.
