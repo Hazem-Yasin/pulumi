@@ -23,11 +23,14 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/pulumi/esc/ast"
 	"github.com/pulumi/esc/eval"
+	"github.com/texttheater/golang-levenshtein/levenshtein"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pgavlin/fx"
@@ -343,6 +346,95 @@ func SimplifyMarshalledProject(raw interface{}) (map[string]interface{}, error) 
 	return obj, nil
 }
 
+// Finds the closest attribute name to a known attribute name,
+//
+// This uses the levenshtein distance (edit distance) metric and does case-insensitive
+// comparison to find capitalization issues.
+//
+// In the unlikely event that a name has exactly the same edit distance from two different
+// attributes, then this dependent on the map order, which isn't stable. Sorting the keys
+// would solve this but seems like overkill
+func findClosestKey(needle string, haystack map[string]interface{}) (string, int) {
+	closestDistance := len(needle)
+	closest := ""
+	for key := range haystack {
+		l := levenshtein.DistanceForStrings([]rune(strings.ToLower(needle)), []rune(strings.ToLower(key)),
+			levenshtein.DefaultOptionsWithSub)
+		if l == 0 {
+			// short circuit, there is no better match possible.
+			return key, 0
+		} else if l < closestDistance {
+			closestDistance = l
+			closest = key
+		}
+	}
+	return closest, closestDistance
+}
+
+// Walks a path to find the schema for the node in question, then lists
+// the known attributes for that node
+func getSchemaPathAttributes(path string) map[string]interface{} {
+	elements := strings.Split(path, "/")
+	isNumber := regexp.MustCompile(`^\d+$`)
+
+	curr := ProjectSchema
+	for len(elements) > 0 {
+		attr := elements[0]
+		elements = elements[1:]
+		if attr == "" {
+			continue
+		}
+
+		// If this schema node points to another
+		if curr.Ref != nil {
+			curr = curr.Ref
+		}
+
+		// check properties
+		if schema, ok := curr.Properties[attr]; ok {
+			curr = schema
+			continue
+		}
+
+		// check additional properties
+		if curr.AdditionalProperties != nil {
+			if additional, ok := curr.AdditionalProperties.(map[string]*jsonschema.Schema); ok {
+				if schema, ok := additional[attr]; ok {
+					curr = schema
+					continue
+				}
+			}
+		}
+
+		// check for array item
+		if isNumber.MatchString(attr) && curr.Items2020 != nil {
+			curr = curr.Items2020
+			continue
+		}
+
+		// no match found for path
+		return nil
+	}
+
+	if curr.Ref != nil {
+		curr = curr.Ref
+	}
+
+	knownProperties := make(map[string]interface{})
+	for k, v := range curr.Properties {
+		knownProperties[k] = v
+	}
+	if curr.AdditionalProperties != nil {
+		if additional, ok := curr.AdditionalProperties.(map[string]*jsonschema.Schema); ok {
+			for k, v := range additional {
+				knownProperties[k] = v
+			}
+		}
+	}
+
+	return knownProperties
+}
+
 func ValidateProject(raw interface{}) error {
 	project, err := SimplifyMarshalledProject(raw)
 	if err != nil {
@@ -352,12 +444,21 @@ func ValidateProject(raw interface{}) error {
 	// Couple of manual errors to match Validate
 	name, ok := project["name"]
 	if !ok {
+		closest, dist := findClosestKey("name", project)
+		if dist <= 2 {
+			return fmt.Errorf("project is missing a 'name' attribute, found '%s' instead", closest)
+		}
+
 		return errors.New("project is missing a 'name' attribute")
 	}
 	if strName, ok := name.(string); !ok || strName == "" {
 		return errors.New("project is missing a non-empty string 'name' attribute")
 	}
 	if _, ok := project["runtime"]; !ok {
+		closest, dist := findClosestKey("runtime", project)
+		if dist <= 2 {
+			return fmt.Errorf("project is missing a 'runtime' attribute, found '%s' instead", closest)
+		}
 		return errors.New("project is missing a 'runtime' attribute")
 	}
 
@@ -370,6 +471,8 @@ func ValidateProject(raw interface{}) error {
 		return err
 	}
 
+	notAllowedRe := regexp.MustCompile(`'(\w[a-zA-Z0-9_]*)' not allowed$`)
+
 	var errs *multierror.Error
 	var appendError func(err *jsonschema.ValidationError)
 	appendError = func(err *jsonschema.ValidationError) {
@@ -379,7 +482,29 @@ func ValidateProject(raw interface{}) error {
 				return fmt.Errorf("%s: %s", path, fmt.Sprintf(message, args...))
 			}
 
-			errs = multierror.Append(errs, errorf("#"+err.InstanceLocation, "%v", err.Message))
+			msg := err.Message
+
+			if match := notAllowedRe.FindStringSubmatch(msg); match != nil {
+				attrName := match[1]
+				attributes := getSchemaPathAttributes(err.InstanceLocation)
+				closest, dist := findClosestKey(attrName, attributes)
+				if dist <= 2 {
+					msg = fmt.Sprintf("%s, did you mean '%s'", msg, closest)
+				} else if len(attributes) > 0 {
+					valid := make([]string, 0, len(attributes))
+					for k := range attributes {
+						valid = append(valid, "'"+k+"'")
+					}
+					if len(valid) > 1 {
+						sort.StringSlice.Sort(valid)
+						msg = fmt.Sprintf("%s, the expected attributes are %v and %s",
+							msg, strings.Join(valid[:len(valid)-1], ", "), valid[len(valid)-1])
+					} else {
+						msg = fmt.Sprintf("%s, the only expected attribute is %s", msg, valid[0])
+					}
+				}
+			}
+			errs = multierror.Append(errs, errorf("#"+err.InstanceLocation, "%v", msg))
 		}
 		for _, err := range err.Causes {
 			appendError(err)

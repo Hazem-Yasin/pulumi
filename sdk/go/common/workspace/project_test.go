@@ -147,36 +147,36 @@ func TestProjectValidationSucceedsForCorrectDefaultValueType(t *testing.T) {
 	assert.NoError(t, err, "There should be no validation error")
 }
 
+func writeAndLoad(t *testing.T, str string) (*Project, error) {
+	tmp, err := os.CreateTemp("", "*.json")
+	assert.NoError(t, err)
+	path := tmp.Name()
+	err = os.WriteFile(path, []byte(str), 0o600)
+	assert.NoError(t, err)
+	return LoadProject(path)
+}
+
 func TestProjectLoadJSON(t *testing.T) {
 	t.Parallel()
 
-	writeAndLoad := func(str string) (*Project, error) {
-		tmp, err := os.CreateTemp("", "*.json")
-		assert.NoError(t, err)
-		path := tmp.Name()
-		err = os.WriteFile(path, []byte(str), 0o600)
-		assert.NoError(t, err)
-		return LoadProject(path)
-	}
-
 	// Test wrong type
-	_, err := writeAndLoad("\"hello  \"")
+	_, err := writeAndLoad(t, "\"hello  \"")
 	assert.ErrorContains(t, err, "expected project to be an object, was 'string'")
 
 	// Test lack of name
-	_, err = writeAndLoad("{}")
+	_, err = writeAndLoad(t, "{}")
 	assert.ErrorContains(t, err, "project is missing a 'name' attribute")
 
 	// Test bad name
-	_, err = writeAndLoad("{\"name\": \"\"}")
+	_, err = writeAndLoad(t, "{\"name\": \"\"}")
 	assert.ErrorContains(t, err, "project is missing a non-empty string 'name' attribute")
 
 	// Test missing runtime
-	_, err = writeAndLoad("{\"name\": \"project\"}")
+	_, err = writeAndLoad(t, "{\"name\": \"project\"}")
 	assert.ErrorContains(t, err, "project is missing a 'runtime' attribute")
 
 	// Test other schema errors
-	_, err = writeAndLoad("{\"name\": \"project\", \"runtime\": 4}")
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": 4}")
 	// These can vary in order, so contains not equals check
 	expected := []string{
 		"3 errors occurred:",
@@ -188,7 +188,7 @@ func TestProjectLoadJSON(t *testing.T) {
 		assert.ErrorContains(t, err, e)
 	}
 
-	_, err = writeAndLoad("{\"name\": \"project\", \"runtime\": \"test\", \"backend\": 4, \"main\": {}}")
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", \"backend\": 4, \"main\": {}}")
 	expected = []string{
 		"2 errors occurred:",
 		"* #/main: expected string or null, but got object",
@@ -199,17 +199,58 @@ func TestProjectLoadJSON(t *testing.T) {
 	}
 
 	// Test success
-	proj, err := writeAndLoad("{\"name\": \"project\", \"runtime\": \"test\"}")
+	proj, err := writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\"}")
 	assert.NoError(t, err)
 	assert.Equal(t, tokens.PackageName("project"), proj.Name)
 	assert.Equal(t, "test", proj.Runtime.Name())
 
 	// Test null optionals should work
-	proj, err = writeAndLoad("{\"name\": \"project\", \"runtime\": \"test\", " +
+	proj, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", "+
 		"\"description\": null, \"main\": null, \"backend\": null}")
 	assert.NoError(t, err)
 	assert.Nil(t, proj.Description)
 	assert.Equal(t, "", proj.Main)
+}
+
+func TestProjectLoadJSONInformativeErrors(t *testing.T) {
+	t.Parallel()
+
+	_, err := writeAndLoad(t, "{\"Name\": \"project\", \"runtime\": \"test\"}")
+	assert.ErrorContains(t, err, "project is missing a 'name' attribute")
+	assert.ErrorContains(t, err, "found 'Name' instead")
+
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"rutnime\": \"test\"}")
+	assert.ErrorContains(t, err, "project is missing a 'runtime' attribute")
+	assert.ErrorContains(t, err, "found 'rutnime' instead")
+
+	// Minor spelling mistake deeper in the schema is identified and a more helpful error created
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", \"template\":{\"displatName\":\"foo\"}}")
+	assert.ErrorContains(t, err, "'displatName' not allowed, did you mean 'displayName'")
+
+	// Major spelling mistake deeper in the schema is identified
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", "+
+		"\"template\":{\"displayNameDisplayName\":\"foo\"}}")
+	assert.ErrorContains(t, err, "'displayNameDisplayName' not allowed")
+	assert.ErrorContains(t, err, "'displayNameDisplayName' not allowed, the expected attributes are "+
+		"'config', 'description', 'displayName', 'important', 'metadata' and 'quickstart'")
+
+	// Error message is different when there is only one choice
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", "+
+		"\"backend\": {\"url\": \"https://pulumi.com\", \"name\": \"test\"}}")
+	assert.ErrorContains(t, err, "'name' not allowed")
+	assert.ErrorContains(t, err, "'name' not allowed, the only expected attribute is 'url'")
+
+	// Minor spelling mistake even deeper in the schema is identified and a more helpful error created
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", "+
+		"\"plugins\":{\"providers\": [{\"nome\": \"test\"}]}}")
+	assert.ErrorContains(t, err, "'nome' not allowed, did you mean 'name'")
+
+	// Major spelling mistake event deeper in the schema is identified
+	_, err = writeAndLoad(t, "{\"name\": \"project\", \"runtime\": \"test\", "+
+		"\"plugins\":{\"providers\": [{\"displayName\": \"test\"}]}}")
+	assert.ErrorContains(t, err, "'displayName' not allowed")
+	assert.ErrorContains(t, err, "'displayName' not allowed, the expected attributes are "+
+		"'name', 'path' and 'version'")
 }
 
 func deleteFile(t *testing.T, file *os.File) {
