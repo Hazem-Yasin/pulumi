@@ -33,18 +33,100 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing_extensions.final
+class ParameterizeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class ParametersArgs(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ARGS_FIELD_NUMBER: builtins.int
+        @property
+        def args(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        def __init__(
+            self,
+            *,
+            args: collections.abc.Iterable[builtins.str] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["args", b"args"]) -> None: ...
+
+    @typing_extensions.final
+    class ParametersValue(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VERSION_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        """The key (a valid package name) for this sub-schema parameterization."""
+        version: builtins.str
+        """The package version this was sent from."""
+        @property
+        def value(self) -> google.protobuf.struct_pb2.Value:
+            """The embedded value from the package."""
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            version: builtins.str = ...,
+            value: google.protobuf.struct_pb2.Value | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value", "version", b"version"]) -> None: ...
+
+    ARGS_FIELD_NUMBER: builtins.int
+    VALUE_FIELD_NUMBER: builtins.int
+    @property
+    def args(self) -> global___ParameterizeRequest.ParametersArgs:
+        """arguments from the command line."""
+    @property
+    def value(self) -> global___ParameterizeRequest.ParametersValue:
+        """values from a generated package."""
+    def __init__(
+        self,
+        *,
+        args: global___ParameterizeRequest.ParametersArgs | None = ...,
+        value: global___ParameterizeRequest.ParametersValue | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["args", b"args", "parameters", b"parameters", "value", b"value"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["args", b"args", "parameters", b"parameters", "value", b"value"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["parameters", b"parameters"]) -> typing_extensions.Literal["args", "value"] | None: ...
+
+global___ParameterizeRequest = ParameterizeRequest
+
+@typing_extensions.final
+class ParameterizeResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    """The key (a valid package name) for this parameterization."""
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["key", b"key"]) -> None: ...
+
+global___ParameterizeResponse = ParameterizeResponse
+
+@typing_extensions.final
 class GetSchemaRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     VERSION_FIELD_NUMBER: builtins.int
+    KEY_FIELD_NUMBER: builtins.int
     version: builtins.int
     """the schema version."""
+    key: builtins.str
+    """an optional key for a parameterized sub-schema."""
     def __init__(
         self,
         *,
         version: builtins.int = ...,
+        key: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["version", b"version"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "version", b"version"]) -> None: ...
 
 global___GetSchemaRequest = GetSchemaRequest
 

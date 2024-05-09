@@ -74,20 +74,21 @@ func TestProvider(t *testing.T) {
 			expectedErr := errors.New("expected error")
 			var called bool
 			prov := &Provider{
-				GetSchemaF: func(version int) ([]byte, error) {
+				GetSchemaF: func(version int, key string) ([]byte, error) {
 					assert.Equal(t, 1, version)
+					assert.Equal(t, "test", key)
 					called = true
 					return nil, expectedErr
 				},
 			}
-			_, err := prov.GetSchema(1)
+			_, err := prov.GetSchema(1, "test")
 			assert.ErrorIs(t, err, expectedErr)
 			assert.True(t, called)
 		})
 		t.Run("no GetSchemaF", func(t *testing.T) {
 			t.Parallel()
 			prov := &Provider{}
-			b, err := prov.GetSchema(0)
+			b, err := prov.GetSchema(0, "")
 			assert.NoError(t, err)
 			assert.Equal(t, []byte("{}"), b)
 		})

@@ -101,7 +101,7 @@ func TestProviderVersions(t *testing.T) {
 			version, err := getProviderVersion(provider)
 			require.NoError(t, err)
 
-			schema, err := provider.GetSchema(0)
+			schema, err := provider.GetSchema(0, "")
 			require.NoError(t, err)
 
 			var schemaJSON struct {

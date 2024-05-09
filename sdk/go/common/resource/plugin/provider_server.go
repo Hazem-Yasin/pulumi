@@ -129,10 +129,20 @@ func (p *providerServer) marshalDiff(diff DiffResult) (*pulumirpc.DiffResponse, 
 	}, nil
 }
 
+func (p *providerServer) Parameterize(
+	ctx context.Context, req *pulumirpc.ParameterizeRequest,
+) (*pulumirpc.ParameterizeResponse, error) {
+	resp, err := p.provider.Parameterize(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (p *providerServer) GetSchema(ctx context.Context,
 	req *pulumirpc.GetSchemaRequest,
 ) (*pulumirpc.GetSchemaResponse, error) {
-	schema, err := p.provider.GetSchema(int(req.GetVersion()))
+	schema, err := p.provider.GetSchema(int(req.GetVersion()), req.GetKey())
 	if err != nil {
 		return nil, err
 	}
