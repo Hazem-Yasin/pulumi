@@ -50,6 +50,7 @@ T2 = TypeVar("T2")
 T3 = TypeVar("T3")
 T_co = TypeVar("T_co", covariant=True)
 U = TypeVar("U")
+U_co = TypeVar("U_co", covariant=True)
 
 Input = Union[T, Awaitable[T], "Output[T]"]
 Inputs = Mapping[str, Input[Any]]
@@ -291,21 +292,21 @@ class Output(Generic[T_co]):
 
     @overload
     @staticmethod
-    def from_input(val: "Output[T_co]") -> "Output[T_co]": ...
+    def from_input(val: "Output[U_co]") -> "Output[U_co]": ...
 
     @overload
     @staticmethod
-    def from_input(val: Input[T_co]) -> "Output[T_co]": ...
+    def from_input(val: Input[U_co]) -> "Output[U_co]": ...
 
     @staticmethod
-    def from_input(val: Input[T_co]) -> "Output[T_co]":
+    def from_input(val: Input[U_co]) -> "Output[U_co]":
         """
         Takes an Input value and produces an Output value from it, deeply unwrapping nested Input values through nested
         lists, dicts, and input classes.  Nested objects of other types (including Resources) are not deeply unwrapped.
 
-        :param Input[T_co] val: An Input to be converted to an Output.
+        :param Input[U_co] val: An Input to be converted to an Output.
         :return: A deeply-unwrapped Output that is guaranteed to not contain any Input values.
-        :rtype: Output[T_co]
+        :rtype: Output[U_co]
         """
 
         # Is it an output already? Recurse into the value contained within it.
@@ -325,7 +326,7 @@ class Output(Generic[T_co]):
                 # directly with no arguments.
                 lambda d: typ(**d) if d else typ()
             )
-            return cast(Output[T_co], o_typ)
+            return cast(Output[U_co], o_typ)
 
         # Is a (non-empty) dict, list, or tuple? Recurse into the values within them.
         if val and isinstance(val, dict):
@@ -340,17 +341,17 @@ class Output(Generic[T_co]):
                 return Output.all(**d)
 
             o_dict: Output[dict] = Output.all(*keys).apply(liftValues)
-            return cast(Output[T_co], o_dict)
+            return cast(Output[U_co], o_dict)
 
         if val and isinstance(val, list):
             o_list: Output[list] = Output.all(*val)
-            return cast(Output[T_co], o_list)
+            return cast(Output[U_co], o_list)
 
         if val and isinstance(val, tuple):
             # We can splat a tuple into all, but we'll always get back a list...
             o_list = Output.all(*val)
             # ...so we need to convert back to a tuple.
-            return cast(Output[T_co], o_list.apply(tuple))
+            return cast(Output[U_co], o_list.apply(tuple))
 
         # If it's not an output, tuple, list, or dict, it must be known and not secret
         is_known_fut: asyncio.Future[bool] = asyncio.Future()
@@ -373,7 +374,7 @@ class Output(Generic[T_co]):
         return Output(set(), value_fut, is_known_fut, is_secret_fut)
 
     @staticmethod
-    def _from_input_shallow(val: Input[T]) -> "Output[T]":
+    def _from_input_shallow(val: Input[U_co]) -> "Output[U_co]":
         """
         Like `from_input`, but does not recur deeply. Instead, checks if `val` is an `Output` value
         and returns it as is. Otherwise, promotes a known value or future to `Output`.
@@ -404,7 +405,7 @@ class Output(Generic[T_co]):
         return Output(set(), value_fut, is_known_fut, is_secret_fut)
 
     @staticmethod
-    def unsecret(val: "Output[T]") -> "Output[T]":
+    def unsecret(val: "Output[U_co]") -> "Output[U_co]":
         """
         Takes an existing Output, deeply unwraps the nested values and returns a new Output without any secrets included
 
@@ -417,7 +418,7 @@ class Output(Generic[T_co]):
         return Output(val._resources, val._future, val._is_known, is_secret)
 
     @staticmethod
-    def secret(val: Input[T]) -> "Output[T]":
+    def secret(val: Input[U_co]) -> "Output[U_co]":
         """
         Takes an Input value and produces an Output value from it, deeply unwrapping nested Input values as necessary
         given the type. It also marks the returned Output as a secret, so its contents will be persisted in an encrypted
@@ -437,22 +438,22 @@ class Output(Generic[T_co]):
     # https://mypy.readthedocs.io/en/stable/more_types.html#type-checking-the-variants:~:text=considered%20unsafely%20overlapping
     @overload
     @staticmethod
-    def all(*args: "Output[T_co]") -> "Output[List[T_co]]": ...  # type: ignore
+    def all(*args: "Output[U_co]") -> "Output[List[U_co]]": ...  # type: ignore
 
     @overload
     @staticmethod
-    def all(**kwargs: "Output[T_co]") -> "Output[Dict[str, T_co]]": ...  # type: ignore
+    def all(**kwargs: "Output[U_co]") -> "Output[Dict[str, U_co]]": ...  # type: ignore
 
     @overload
     @staticmethod
-    def all(*args: Input[T_co]) -> "Output[List[T_co]]": ...  # type: ignore
+    def all(*args: Input[U_co]) -> "Output[List[U_co]]": ...  # type: ignore
 
     @overload
     @staticmethod
-    def all(**kwargs: Input[T_co]) -> "Output[Dict[str, T_co]]": ...  # type: ignore
+    def all(**kwargs: Input[U_co]) -> "Output[Dict[str, U_co]]": ...  # type: ignore
 
     @staticmethod
-    def all(*args: Input[T_co], **kwargs: Input[T_co]):
+    def all(*args: Input[U_co], **kwargs: Input[U_co]):
         """
         Produces an Output of a list (if args i.e a list of inputs are supplied)
         or dict (if kwargs i.e. keyworded arguments are supplied).
